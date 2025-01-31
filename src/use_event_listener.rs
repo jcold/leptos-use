@@ -121,7 +121,7 @@ where
     #[cfg(not(feature = "ssr"))]
     {
         let event_name = event.name();
-        let closure_js = Closure::wrap(Box::new(move |e| {
+        let closure_js = Closure::wrap(Box::new(move |e: _| {
             #[cfg(debug_assertions)]
             let prev = SpecialNonReactiveZone::enter();
 
@@ -130,18 +130,24 @@ where
             #[cfg(debug_assertions)]
             SpecialNonReactiveZone::exit(prev);
         }) as Box<dyn FnMut(_)>)
-        .into_js_value();
+        // .into_js_value()
+        // 
+        ;
+        let closure_js = Rc::new(closure_js);
 
         let cleanup_fn = {
             let closure_js = closure_js.clone();
             let options = options.as_add_event_listener_options();
 
             move |element: &web_sys::EventTarget| {
-                let _ = element.remove_event_listener_with_callback_and_event_listener_options(
-                    &event_name,
-                    closure_js.as_ref().unchecked_ref(),
-                    options.unchecked_ref(),
-                );
+                element
+                    .remove_event_listener_with_callback_and_event_listener_options(
+                        &event_name,
+                        closure_js.as_ref().as_ref().unchecked_ref(),
+                        options.unchecked_ref(),
+                    )
+                    .unwrap();
+                tracing::info!("event_listener cleanup");
             }
         };
 
@@ -164,6 +170,8 @@ where
         let stop_watch = {
             let cleanup_prev_element = cleanup_prev_element.clone();
 
+            let closure_js = closure_js.clone();
+
             watch_with_options(
                 move || signal.get().map(|e| e.into()),
                 move |element, _, _| {
@@ -176,7 +184,7 @@ where
                         _ = element
                             .add_event_listener_with_callback_and_add_event_listener_options(
                                 &event_name,
-                                closure_js.as_ref().unchecked_ref(),
+                                closure_js.as_ref().as_ref().unchecked_ref(),
                                 &options,
                             );
                     }
@@ -188,6 +196,7 @@ where
         let stop = move || {
             stop_watch();
             cleanup_prev_element();
+            tracing::info!("event_listener unlisten");
         };
 
         on_cleanup(stop.clone());
