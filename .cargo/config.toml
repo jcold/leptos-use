@@ -1,3 +1,6 @@
 [build]
 rustflags = ["--cfg=web_sys_unstable_apis"]
 rustdocflags = ["--cfg=web_sys_unstable_apis"]
+
+[patch.crates-io]
+leptos = { path = "/Users/dayu/Downloads/tmp/leptos0615/leptos" }
